@@ -23,6 +23,9 @@
   <!-- Google Sign-In provider (OAuth) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js"></script>
 
+  <!-- Capacitor Native Bridge -->
+  <script src="capacitor.js"></script>
+
   <!-- Theme Init (Prevents FOUC) -->
   <script>
     (function() {
@@ -160,6 +163,21 @@
     @keyframes indicator-slide {
       from { transform: scaleX(0); }
       to   { transform: scaleX(1); }
+    }
+
+    @keyframes milestone-glow {
+      0%, 100% { box-shadow: 0 0 10px rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.3); }
+      50% { box-shadow: 0 0 25px rgba(16, 185, 129, 0.6); border-color: var(--accent); }
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-10px) rotate(3deg); }
+    }
+    .badge-glowing {
+      animation: milestone-glow 3s infinite;
+    }
+    .float-animation {
+      animation: float 4s ease-in-out infinite;
     }
 
     .animate-fade-up { animation: fadeUp 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
@@ -786,16 +804,138 @@
 
     const LEVELS = [
       { level: 1, title: 'Novice Tracker',      icon: '🌱', xp: 0 },
-      { level: 2, title: 'Habit Builder',        icon: '🛠️', xp: 120 },
-      { level: 3, title: 'Consistency Cadet',   icon: '🛡️', xp: 240 },
-      { level: 4, title: 'Streak Scout',         icon: '🗺️', xp: 480 },
-      { level: 5, title: 'Routine Officer',      icon: '⚔️', xp: 720 },
-      { level: 6, title: 'Discipline Elite',     icon: '🔥', xp: 1080 },
-      { level: 7, title: 'Mastery Sage',         icon: '🔮', xp: 1440 },
-      { level: 8, title: 'Ritual Sovereign',     icon: '👑', xp: 1920 },
-      { level: 9, title: 'Zenith Champion',      icon: '⚡', xp: 2400 },
-      { level: 10, title: 'Cosmic Exemplar',     icon: '✨', xp: 3000 },
+      { level: 2, title: 'Habit Builder',        icon: '🛠️', xp: 200 },
+      { level: 3, title: 'Consistency Cadet',   icon: '🛡️', xp: 600 },
+      { level: 4, title: 'Streak Scout',         icon: '🗺️', xp: 1200 },
+      { level: 5, title: 'Routine Officer',      icon: '⚔️', xp: 2100 },
+      { level: 6, title: 'Discipline Elite',     icon: '🔥', xp: 3300 },
+      { level: 7, title: 'Mastery Sage',         icon: '🔮', xp: 4900 },
+      { level: 8, title: 'Ritual Sovereign',     icon: '👑', xp: 6900 },
+      { level: 9, title: 'Zenith Champion',      icon: '⚡', xp: 9400 },
+      { level: 10, title: 'Cosmic Exemplar',     icon: '✨', xp: 12900 },
     ];
+
+    const MILESTONES = [
+      { id: 'first_habit', title: 'Novice Catalyst', desc: 'Create your first habit', xpReward: 50, icon: '🌱', check: (habits, history) => habits.length >= 1 },
+      { id: 'checkbox_master', title: 'First Victory', desc: 'Check off your first habit', xpReward: 50, icon: '✅', check: (habits, history) => {
+        return Object.values(history).some(logs => Object.values(logs).some(v => v >= 1));
+      }},
+      { id: 'streak_3', title: 'Trio Ignition', desc: 'Reach a 3-day streak on any habit', xpReward: 100, icon: '🔥', check: (habits, history) => habits.some(h => h.streak >= 3) },
+      { id: 'streak_7', title: 'Weekly Warrior', desc: 'Reach a 7-day streak on any habit', xpReward: 250, icon: '🛡️', check: (habits, history) => habits.some(h => h.streak >= 7) },
+      { id: 'streak_15', title: 'Discipline Sentinel', desc: 'Reach a 15-day streak on any habit', xpReward: 500, icon: '⚔️', check: (habits, history) => habits.some(h => h.streak >= 15) },
+      { id: 'streak_30', title: 'Ritual Overlord', desc: 'Reach a 30-day streak on any habit', xpReward: 1000, icon: '👑', check: (habits, history) => habits.some(h => h.streak >= 30) },
+      { id: 'perfect_day', title: 'Perfect Sync', desc: 'Complete all habits in a single day', xpReward: 150, icon: '⚡', check: (habits, history) => {
+        const dates = new Set();
+        Object.values(history).forEach(logs => Object.keys(logs).forEach(d => dates.add(d)));
+        if (dates.size === 0 || habits.length === 0) return false;
+        for (let d of dates) {
+          let allDone = true;
+          for (let h of habits) {
+            const val = history[h.id]?.[d] || 0;
+            if (val < h.targetValue) { allDone = false; break; }
+          }
+          if (allDone) return true;
+        }
+        return false;
+      }},
+      { id: 'habit_hoarder', title: 'Ritualist Cohort', desc: 'Have 5 or more active habits', xpReward: 150, icon: '📚', check: (habits, history) => habits.length >= 5 }
+    ];
+
+    const xpNeededForNext = (level) => {
+      if (level === 1) return 200;
+      if (level === 2) return 400;
+      if (level === 3) return 600;
+      if (level === 4) return 900;
+      if (level === 5) return 1200;
+      if (level === 6) return 1600;
+      if (level === 7) return 2000;
+      if (level === 8) return 2500;
+      if (level === 9) return 3500;
+      return 5000;
+    };
+
+    /* ── Android Widget Sync ── */
+    const syncAndroidWidget = async (profVal, habsVal, histVal) => {
+      try {
+        const { HabWidget } = window.Capacitor.Plugins;
+        if (!HabWidget || !HabWidget.updateWidgetData) {
+          console.warn("HabWidget plugin not loaded/available in Capacitor!");
+          return false;
+        }
+
+        const today = todayStr();
+        const totalCount = habsVal.length;
+        const completed = habsVal.filter(h => {
+          const val = histVal[h.id]?.[today] || 0;
+          return val >= h.targetValue;
+        });
+        const completedCount = completed.length;
+        const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+        const pending = habsVal.filter(h => {
+          const val = histVal[h.id]?.[today] || 0;
+          return val < h.targetValue;
+        });
+        const nextHabit = pending.length > 0 ? pending[0].name : "All caught up!";
+
+        await HabWidget.updateWidgetData({
+          title: profVal.title || "Novice Tracker",
+          level: profVal.level || 1,
+          progress: progress,
+          completedCount: completedCount,
+          totalCount: totalCount,
+          nextHabit: nextHabit
+        });
+        return true;
+      } catch (e) {
+        console.warn("Capacitor widget plugin error:", e);
+        return false;
+      }
+    };
+
+    /* ── Milestone Check and Award ── */
+    const checkAndAwardMilestones = (updatedProfile, updatedHabits, updatedHistory) => {
+      if (!updatedProfile.badges) updatedProfile.badges = [];
+      let xpGained = 0;
+      let newlyUnlocked = [];
+
+      MILESTONES.forEach(m => {
+        if (!updatedProfile.badges.includes(m.id)) {
+          if (m.check(updatedHabits, updatedHistory)) {
+            updatedProfile.badges.push(m.id);
+            xpGained += m.xpReward;
+            newlyUnlocked.push(m);
+          }
+        }
+      });
+
+      if (xpGained > 0) {
+        let xp = updatedProfile.xp + xpGained;
+        let lvl = updatedProfile.level;
+        let didLevel = false;
+        while (lvl < 10) {
+          const needed = xpNeededForNext(lvl);
+          if (xp >= needed) {
+            xp -= needed;
+            lvl++;
+            didLevel = true;
+          } else {
+            break;
+          }
+        }
+        updatedProfile.xp = xp;
+        updatedProfile.level = lvl;
+        const match = LEVELS.find(l => l.level === lvl);
+        if (match) updatedProfile.title = match.title;
+
+        if (newlyUnlocked.length > 0) {
+          // We assume states like setUnlockedMilestoneData are handled by component context if needed
+        }
+      }
+      return updatedProfile;
+    };
+
+
 
     const AVATAR_ICONS = ['🎯','👑','⭐','🛡️','🔥','❤️','🏆','✨','⚡','🌙','🦋','🚀'];
     const HABIT_COLORS = ['#FFB74D','#4ADE80','#60A5FA','#F472B6','#A78BFA','#FB923C','#34D399','#F87171'];
@@ -827,10 +967,12 @@
       const [analyticsYear, setAnalyticsYear] = useState(new Date().getFullYear());
       const [analyticsMonth, setAnalyticsMonth] = useState(new Date().getMonth());
 
-      const [profile, setProfile] = useState({ name: 'Explorer', level: 1, xp: 0, title: 'Novice Tracker', avatarIcon: '🏆', avatarBg: '#1d1e21' });
+      const [profile, setProfile] = useState({ name: 'Explorer', level: 1, xp: 0, title: 'Novice Tracker', avatarIcon: '🏆', avatarBg: '#1d1e21', badges: [] });
       const [showAddModal, setShowAddModal] = useState(false);
       const [editHabit, setEditHabit] = useState(null);
       const [levelUpData, setLevelUpData] = useState(null);
+      const [showSettingsModal, setShowSettingsModal] = useState(false);
+      const [unlockedMilestoneData, setUnlockedMilestoneData] = useState(null);
       const [quote, setQuote] = useState(QUOTES[0].text);
       const [editingQuote, setEditingQuote] = useState(false);
 
@@ -841,6 +983,162 @@
         setToast({ text, type });
         setTimeout(() => setToast(null), 3200);
       }, []);
+
+      /* ─── Notification Engine ─── */
+      const [reminderEnabled, setReminderEnabled] = useState(() => {
+        const stored = localStorage.getItem('hab_reminder_enabled');
+        return stored === null ? true : stored === 'true';
+      });
+      const [reminderTime, setReminderTime] = useState(() => {
+        return localStorage.getItem('hab_reminder_time') || '22:00';
+      });
+
+      // Helper to format 24h string to 12h pretty string
+      const formatTime = useCallback((timeStr) => {
+        const [h, m] = timeStr.split(':').map(Number);
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const displayH = h % 12 === 0 ? 12 : h % 12;
+        const displayM = m.toString().padStart(2, '0');
+        return `${displayH}:${displayM} ${ampm}`;
+      }, []);
+
+      // Function to schedule/cancel notifications
+      const syncNotifications = useCallback(async (enabled, timeStr) => {
+        try {
+          const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+          const [hour, minute] = timeStr.split(':').map(Number);
+
+          if (isNative) {
+            const { LocalNotifications } = window.Capacitor.Plugins;
+            if (!LocalNotifications) return;
+
+            // Check / request permission
+            const perm = await LocalNotifications.checkPermissions();
+            if (perm.display !== 'granted') {
+              const req = await LocalNotifications.requestPermissions();
+              if (req.display !== 'granted') {
+                showToast('Notification permission denied. Enable in settings.', 'warning');
+                return;
+              }
+            }
+
+            // Cancel any existing daily reminder notification
+            await LocalNotifications.cancel({ notifications: [{ id: 101 }] });
+
+            if (enabled) {
+              // Schedule new daily reminder
+              await LocalNotifications.schedule({
+                notifications: [
+                  {
+                    title: "Time to check in! 🌱",
+                    body: "Keep your streaks alive! Update your habits for today. 🔥",
+                    id: 101,
+                    schedule: {
+                      on: {
+                        hour: hour,
+                        minute: minute
+                      },
+                      repeats: true,
+                      allowWhileIdle: true
+                    },
+                    sound: null,
+                    attachments: null,
+                    actionTypeId: "",
+                    extra: null
+                  }
+                ]
+              });
+              console.log(`Scheduled native daily reminder for ${timeStr}`);
+            } else {
+              console.log("Cancelled native daily reminder");
+            }
+          } else {
+            // Web environment fallback
+            if (enabled) {
+              if ('Notification' in window) {
+                if (Notification.permission === 'default') {
+                  await Notification.requestPermission();
+                }
+                if (Notification.permission === 'granted') {
+                  console.log(`Web Reminder active (configured for ${timeStr})`);
+                }
+              }
+            }
+          }
+
+          localStorage.setItem('hab_reminder_enabled', enabled ? 'true' : 'false');
+          localStorage.setItem('hab_reminder_time', timeStr);
+        } catch (err) {
+          console.error("syncNotifications error:", err);
+        }
+      }, [showToast]);
+
+      // Handle time change or toggle
+      const handleReminderToggle = async () => {
+        sfx('click', soundOn);
+        haptic(30);
+        const next = !reminderEnabled;
+        setReminderEnabled(next);
+        await syncNotifications(next, reminderTime);
+        showToast(next ? `Daily reminder set for ${formatTime(reminderTime)}` : 'Daily reminder turned off', 'info');
+      };
+
+      const handleReminderTimeChange = async (newTime) => {
+        setReminderTime(newTime);
+        await syncNotifications(reminderEnabled, newTime);
+        showToast(`Reminder time updated to ${formatTime(newTime)}`, 'success');
+      };
+
+      // Trigger a test notification immediately
+      const triggerTestNotification = async () => {
+        sfx('complete', soundOn);
+        haptic(45);
+        try {
+          const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+          if (isNative) {
+            const { LocalNotifications } = window.Capacitor.Plugins;
+            if (LocalNotifications) {
+              await LocalNotifications.schedule({
+                notifications: [
+                  {
+                    title: "Hab Reminder test successful! 🔔",
+                    body: "This is how you will be notified to update your habits daily at " + formatTime(reminderTime) + "! 🌱",
+                    id: 102,
+                    schedule: { at: new Date(Date.now() + 1000) } // 1 sec later
+                  }
+                ]
+              });
+            }
+          } else {
+            // Web browser fallback
+            if ('Notification' in window) {
+              let perm = Notification.permission;
+              if (perm === 'default') {
+                perm = await Notification.requestPermission();
+              }
+              if (perm === 'granted') {
+                new Notification("Hab Reminder test successful! 🔔", {
+                  body: "This is how you will be notified to update your habits daily at " + formatTime(reminderTime) + "! 🌱",
+                  icon: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=96&auto=format&fit=crop'
+                });
+              } else {
+                showToast("Notification permission denied! Please allow notifications in your browser.", "error");
+              }
+            } else {
+              showToast("Web Notifications are not supported in this browser.", "error");
+            }
+          }
+        } catch (err) {
+          showToast(`Error: ${err.message}`, 'error');
+        }
+      };
+
+      // Automatically sync on initial mount
+      useEffect(() => {
+        if (!authLoading && user) {
+          syncNotifications(reminderEnabled, reminderTime);
+        }
+      }, [user, authLoading, reminderEnabled, reminderTime, syncNotifications]);
 
       /* ── Auth init ── */
       useEffect(() => {
@@ -868,7 +1166,11 @@
           const p = localStorage.getItem(`hab_profile_v5_${uid}`);
           if (h) setHabits(JSON.parse(h));
           if (hi) setHistory(JSON.parse(hi));
-          if (p) setProfile(JSON.parse(p));
+          if (p) {
+            const parsed = JSON.parse(p);
+            if (!parsed.badges) parsed.badges = [];
+            setProfile(parsed);
+          }
           return;
         }
 
@@ -876,15 +1178,26 @@
         const u1 = base.collection('habits').onSnapshot(s => { const a = []; s.forEach(d => a.push({ id: d.id, ...d.data() })); setHabits(a); });
         const u2 = base.collection('history').doc('logs').onSnapshot(d => setHistory(d.exists ? d.data() : {}));
         const u3 = base.collection('profile').doc('data').onSnapshot(d => {
-          if (d.exists) { setProfile(d.data()); }
+          if (d.exists) {
+            const data = d.data();
+            if (!data.badges) data.badges = [];
+            setProfile(data);
+          }
           else {
-            const def = { name: user.displayName || authName.trim() || (user.email ? user.email.split('@')[0] : 'Explorer'), level: 1, xp: 0, title: 'Novice Tracker', avatarIcon: '🏆', avatarBg: '#1d1e21' };
+            const def = { name: user.displayName || authName.trim() || (user.email ? user.email.split('@')[0] : 'Explorer'), level: 1, xp: 0, title: 'Novice Tracker', avatarIcon: '🏆', avatarBg: '#1d1e21', badges: [] };
             setProfile(def);
             base.collection('profile').doc('data').set(def);
           }
         });
         return () => { u1(); u2(); u3(); };
       }, [user, authLoading]);
+
+      // Keep widget in sync with state changes
+      useEffect(() => {
+        if (profile && habits && history && user) {
+          syncAndroidWidget(profile, habits, history);
+        }
+      }, [profile, habits, history, user]);
 
       /* ── Persist ── */
       const persist = async (habs, hist, prof) => {
@@ -940,12 +1253,12 @@
           if (authMode === 'register') {
             if (firebaseAvailable) {
               const cred = await auth.createUserWithEmailAndPassword(authEmail, authPassword);
-              const init = { name: authName.trim(), level: 1, xp: 10, title: 'Novice Tracker', avatarIcon: '🏆', avatarBg: '#1d1e21' };
+              const init = { name: authName.trim(), level: 1, xp: 10, title: 'Novice Tracker', avatarIcon: '🏆', avatarBg: '#1d1e21', badges: [] };
               await db.collection('artifacts').doc(appId).collection('users').doc(cred.user.uid).collection('profile').doc('data').set(init);
             } else {
               const mu = { id: 'u-' + Date.now(), uid: 'u-' + Date.now(), email: authEmail };
               localStorage.setItem('hab_user_v5', JSON.stringify(mu));
-              localStorage.setItem(`hab_profile_v5_${mu.uid}`, JSON.stringify({ name: authName.trim(), level: 1, xp: 10, title: 'Novice Tracker', avatarIcon: '🏆', avatarBg: '#1d1e21' }));
+              localStorage.setItem(`hab_profile_v5_${mu.uid}`, JSON.stringify({ name: authName.trim(), level: 1, xp: 10, title: 'Novice Tracker', avatarIcon: '🏆', avatarBg: '#1d1e21', badges: [] }));
               setUser(mu);
             }
             showToast(`Welcome, ${authName}! 🎉`, 'success');
@@ -1002,7 +1315,8 @@
               const init = {
                 name: cred.user.displayName || cred.user.email.split('@')[0],
                 level: 1, xp: 10, title: 'Novice Tracker',
-                avatarIcon: '🏆', avatarBg: '#1d1e21'
+                avatarIcon: '🏆', avatarBg: '#1d1e21',
+                badges: []
               };
               await base.collection('profile').doc('data').set(init);
             }
@@ -1041,7 +1355,16 @@
         let xp = up.xp + amount;
         let lvl = up.level;
         let didLevel = false;
-        while (xp >= 120 * lvl && lvl < 10) { xp -= 120 * lvl; lvl++; didLevel = true; }
+        while (lvl < 10) {
+          const needed = xpNeededForNext(lvl);
+          if (xp >= needed) {
+            xp -= needed;
+            lvl++;
+            didLevel = true;
+          } else {
+            break;
+          }
+        }
         if (xp < 0) xp = 0;
         up.xp = xp; up.level = lvl;
         const match = LEVELS.find(l => l.level === lvl);
@@ -1053,6 +1376,7 @@
         } else { haptic(35); }
         setProfile(up);
         persist(null, null, up);
+        syncAndroidWidget(up, habits, history);
       };
 
       /* ── Streak ── */
@@ -1083,9 +1407,10 @@
         const wasDone = cur >= habit.targetValue;
         const isDone  = next >= habit.targetValue;
 
-        if (!wasDone && isDone) { sfx('complete', soundOn); addXP(25); }
-        else if (wasDone && !isDone) { sfx('click', soundOn); addXP(-25); }
-        else if (habit.type === 'numeric' && increment && !isDone) { sfx('click', soundOn); addXP(5); }
+        let xpBonus = 0;
+        if (!wasDone && isDone) { sfx('complete', soundOn); xpBonus = 25; }
+        else if (wasDone && !isDone) { sfx('click', soundOn); xpBonus = -25; }
+        else if (habit.type === 'numeric' && increment && !isDone) { sfx('click', soundOn); xpBonus = 5; }
         else { sfx('click', soundOn); }
 
         const newHist = { ...history, [habitId]: { ...logs, [date]: next } };
@@ -1095,11 +1420,40 @@
         const newHabits = habits.map(h => h.id === habitId ? { ...h, streak, maxStreak: Math.max(h.maxStreak || 0, streak) } : h);
         setHabits(newHabits);
 
+        // Apply XP bonus from checking the habit
+        let tempProfile = { ...profile };
+        if (xpBonus !== 0) {
+          let xp = tempProfile.xp + xpBonus;
+          let lvl = tempProfile.level;
+          let didLevel = false;
+          while (lvl < 10) {
+            const needed = xpNeededForNext(lvl);
+            if (xp >= needed) { xp -= needed; lvl++; didLevel = true; }
+            else break;
+          }
+          if (xp < 0) xp = 0;
+          tempProfile.xp = xp;
+          tempProfile.level = lvl;
+          const match = LEVELS.find(l => l.level === lvl);
+          if (match) tempProfile.title = match.title;
+          
+          if (didLevel) {
+            setLevelUpData({ level: lvl, title: tempProfile.title, icon: match?.icon });
+            haptic([80,40,80,40,100]);
+            setTimeout(() => sfx('levelup', soundOn), 80);
+          } else { haptic(35); }
+        }
+
+        // Apply milestone checks
+        const updatedProfile = checkAndAwardMilestones(tempProfile, newHabits, newHist);
+        setProfile(updatedProfile);
+
         if (firebaseAvailable && user) {
           const uid = user.uid || user.id;
           await db.collection('artifacts').doc(appId).collection('users').doc(uid).collection('habits').doc(habitId).update({ streak, maxStreak: Math.max(habit.maxStreak || 0, streak) });
         }
-        persist(newHabits, newHist, null);
+        persist(newHabits, newHist, updatedProfile);
+        syncAndroidWidget(updatedProfile, newHabits, newHist);
       };
 
       /* ── Create habit ── */
@@ -1109,14 +1463,41 @@
         const updated = [...habits, fresh];
         setHabits(updated);
         setShowAddModal(false);
-        addXP(15);
         sfx('complete', soundOn);
         haptic([35,35,35]);
+
+        // Add 15 XP for creating a habit
+        let tempProfile = { ...profile };
+        let xp = tempProfile.xp + 15;
+        let lvl = tempProfile.level;
+        let didLevel = false;
+        while (lvl < 10) {
+          const needed = xpNeededForNext(lvl);
+          if (xp >= needed) { xp -= needed; lvl++; didLevel = true; }
+          else break;
+        }
+        if (xp < 0) xp = 0;
+        tempProfile.xp = xp;
+        tempProfile.level = lvl;
+        const match = LEVELS.find(l => l.level === lvl);
+        if (match) tempProfile.title = match.title;
+        
+        if (didLevel) {
+          setLevelUpData({ level: lvl, title: tempProfile.title, icon: match?.icon });
+          haptic([80,40,80,40,100]);
+          setTimeout(() => sfx('levelup', soundOn), 80);
+        }
+
+        // Run Milestones check
+        const updatedProfile = checkAndAwardMilestones(tempProfile, updated, history);
+        setProfile(updatedProfile);
+
         if (firebaseAvailable && user) {
           const uid = user.uid || user.id;
           await db.collection('artifacts').doc(appId).collection('users').doc(uid).collection('habits').doc(id).set(fresh);
         }
-        persist(updated, null, null);
+        persist(updated, null, updatedProfile);
+        syncAndroidWidget(updatedProfile, updated, history);
         showToast('Habit created 🌱', 'success');
       };
 
@@ -1131,6 +1512,7 @@
           await db.collection('artifacts').doc(appId).collection('users').doc(uid).collection('habits').doc(data.id).set(data);
         }
         persist(updated, null, null);
+        syncAndroidWidget(profile, updated, history);
         showToast('Habit updated', 'success');
       };
 
@@ -1145,6 +1527,7 @@
           await db.collection('artifacts').doc(appId).collection('users').doc(uid).collection('habits').doc(habitId).delete();
         }
         persist(updated, copyHist, null);
+        syncAndroidWidget(profile, updated, copyHist);
         showToast('Habit deleted', 'info');
       };
 
@@ -1325,6 +1708,15 @@
                     </svg>
                   </button>
 
+                  {/* Settings / Widget Control Center */}
+                  <button className="pressable" onClick={() => { sfx('click', soundOn); setShowSettingsModal(true); haptic(25); }}
+                    style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--bg-elevated)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+
                   {/* Sign out */}
                   <button className="pressable" onClick={handleSignOut}
                     style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--bg-elevated)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--danger)' }}>
@@ -1370,20 +1762,7 @@
                     </div>
                   </div>
 
-                  {/* Quote Widget */}
-                  <div className="card" style={{ position: 'relative' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                      <span className="badge badge-muted">Focus Anchor</span>
-                      <button onClick={() => { sfx('click', soundOn); setEditingQuote(!editingQuote); }}
-                        style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: editingQuote ? 'var(--accent)' : 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                        {editingQuote ? '✓ Save' : 'Edit'}
-                      </button>
-                    </div>
-                    {editingQuote
-                      ? <textarea className="input-field" rows={2} value={quote} onChange={e => setQuote(e.target.value)} />
-                      : <p style={{ fontSize: 12, fontStyle: 'italic', lineHeight: 1.6, color: 'var(--text-secondary)', fontWeight: 500 }}>"{quote}"</p>
-                    }
-                  </div>
+
 
                   {/* Date Carousel */}
                   <div className="card" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} style={{ userSelect: 'none' }}>
@@ -1498,6 +1877,22 @@
                       </div>
                     )}
                   </div>
+
+                  {/* Relocated Quote Widget at bottom */}
+                  <div className="card" style={{ position: 'relative', marginTop: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <span className="badge badge-muted">Focus Anchor</span>
+                      <button onClick={() => { sfx('click', soundOn); setEditingQuote(!editingQuote); }}
+                        style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: editingQuote ? 'var(--accent)' : 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                        {editingQuote ? '✓ Save' : 'Edit'}
+                      </button>
+                    </div>
+                    {editingQuote
+                      ? <textarea className="input-field" rows={2} value={quote} onChange={e => setQuote(e.target.value)} />
+                      : <p style={{ fontSize: 12, fontStyle: 'italic', lineHeight: 1.6, color: 'var(--text-secondary)', fontWeight: 500 }}>"{quote}"</p>
+                    }
+                  </div>
+
                 </div>
               )}
 
@@ -1653,10 +2048,10 @@
                     <div style={{ marginTop: 18 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                         <span className="section-header">XP Progress</span>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{profile.xp} / {profile.level * 120} XP</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{profile.xp} / {xpNeededForNext(profile.level)} XP</span>
                       </div>
                       <div className="xp-bar">
-                        <div className="xp-bar-fill" style={{ width: `${Math.min(100, (profile.xp / (profile.level * 120)) * 100)}%` }} />
+                        <div className="xp-bar-fill" style={{ width: `${Math.min(100, (profile.xp / xpNeededForNext(profile.level)) * 100)}%` }} />
                       </div>
                     </div>
 
@@ -1674,8 +2069,67 @@
                     </div>
                   </div>
 
+                  {/* Milestones Quests Grid */}
+                  <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Consistency Milestones</span>
+                    <span className="badge badge-muted" style={{ fontSize: 8 }}>{profile.badges?.length || 0} / {MILESTONES.length} Achieved</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                    {MILESTONES.map(m => {
+                      const unlocked = profile.badges?.includes(m.id);
+                      return (
+                        <div
+                          key={m.id}
+                          className={`card pressable ${unlocked ? 'badge-glowing animate-fade-up' : ''}`}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            textAlign: 'center',
+                            padding: '16px 12px',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            background: unlocked ? 'linear-gradient(135deg, var(--bg-card) 0%, var(--accent-dim) 100%)' : 'var(--bg-card)',
+                            border: unlocked ? '1px solid var(--border-active)' : '1px solid var(--border)',
+                            opacity: unlocked ? 1 : 0.6,
+                            cursor: 'default',
+                            transition: 'all 0.3s ease'
+                          }}
+                        >
+                          {/* Giant emoji badge */}
+                          <div style={{
+                            fontSize: 36,
+                            marginBottom: 8,
+                            filter: unlocked ? 'drop-shadow(0 0 6px var(--accent))' : 'grayscale(100%)',
+                            opacity: unlocked ? 1 : 0.4,
+                            transition: 'all 0.3s'
+                          }}>
+                            {m.icon}
+                          </div>
+
+                          <div style={{ fontSize: 12, fontWeight: 900, color: unlocked ? 'var(--accent)' : 'var(--text-secondary)' }}>
+                            {m.title}
+                          </div>
+
+                          <div style={{ fontSize: 9.5, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.3 }}>
+                            {m.desc}
+                          </div>
+
+                          {/* XP Reward Badge or Unlocked Status Tag */}
+                          <div style={{ marginTop: 10 }}>
+                            {unlocked ? (
+                              <span className="badge badge-accent" style={{ fontSize: 8, padding: '2px 8px' }}>✓ Achieved</span>
+                            ) : (
+                              <span className="badge badge-muted" style={{ fontSize: 8, padding: '2px 8px', color: 'var(--text-secondary)' }}>+{m.xpReward} XP</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
                   {/* Levels ladder */}
-                  <div className="section-header">Ranks Roadmap</div>
+                  <div className="section-header" style={{ marginTop: 6 }}>Ranks Roadmap</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {LEVELS.map(lv => {
                       const isCur = profile.level === lv.level;
@@ -1747,6 +2201,209 @@
 
             {/* ── Edit Habit Modal ── */}
             {editHabit && <EditHabitModal habit={editHabit} onClose={() => setEditHabit(null)} onSubmit={updateHabit} onDelete={deleteHabit} soundOn={soundOn} />}
+
+            {/* ── Settings & Notification Modal ── */}
+            {showSettingsModal && (
+              <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+                onClick={() => setShowSettingsModal(false)}>
+                <div className="card animate-fade-up" style={{ maxWidth: 360, width: '100%', padding: 20, border: '1px solid var(--border-active)', maxHeight: '90dvh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }} onClick={e => e.stopPropagation()}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 900, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: 6 }}>⚙️ Control Center</h3>
+                    <button onClick={() => setShowSettingsModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 16, cursor: 'pointer', fontWeight: 800 }}>✕</button>
+                  </div>
+
+                  {/* 1. Daily Reminder card */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, background: 'linear-gradient(135deg, var(--bg-elevated) 0%, var(--accent-dim) 100%)', padding: 14, borderRadius: 12, border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 18 }}>🔔</span>
+                        <div>
+                          <h4 style={{ fontSize: 12.5, fontWeight: 800 }}>Daily Reminder</h4>
+                          <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                            {reminderEnabled ? `Ping scheduled daily at ${formatTime(reminderTime)}` : 'Reminders are currently paused'}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleReminderToggle}
+                        style={{
+                          width: 44,
+                          height: 24,
+                          borderRadius: 100,
+                          background: reminderEnabled ? 'var(--accent)' : 'var(--border)',
+                          border: 'none',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          padding: 2,
+                          transition: 'background-color 0.3s ease',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <div style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: 100,
+                          background: '#ffffff',
+                          transform: reminderEnabled ? 'translateX(20px)' : 'translateX(0px)',
+                          transition: 'transform 0.3s ease'
+                        }} />
+                      </button>
+                    </div>
+
+                    {reminderEnabled && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: 10, marginTop: 4 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Time:</span>
+                          <select
+                            value={reminderTime}
+                            onChange={(e) => handleReminderTimeChange(e.target.value)}
+                            style={{
+                              padding: '4px 6px',
+                              borderRadius: 6,
+                              background: 'var(--bg-card)',
+                              border: '1px solid var(--border)',
+                              fontSize: 11.5,
+                              fontWeight: 800,
+                              color: 'var(--accent)',
+                              outline: 'none',
+                              fontFamily: 'var(--font-mono)'
+                            }}
+                          >
+                            {['17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00', '23:30', '00:00'].map(t => (
+                              <option key={t} value={t}>{formatTime(t)}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <button
+                          onClick={triggerTestNotification}
+                          className="pressable"
+                          style={{
+                            padding: '5px 10px',
+                            background: 'var(--accent-dim)',
+                            color: 'var(--accent)',
+                            border: '1px solid var(--border-active)',
+                            borderRadius: 6,
+                            fontSize: 10,
+                            fontWeight: 800,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ⚡ Test Push
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. Homescreen Widget Center */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <h4 style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>🌱 Widget Center</h4>
+                    
+                    {/* CSS Mockup of Android Widget */}
+                    <div style={{
+                      background: '#16171a',
+                      borderRadius: 14,
+                      border: '1px solid #2c2d30',
+                      padding: 14,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                      userSelect: 'none',
+                      position: 'relative'
+                    }}>
+                      {/* Left Accent Bar */}
+                      <div style={{ width: 4, height: '100%', background: '#10b981', position: 'absolute', left: 0, top: 0, bottom: 0, borderTopLeftRadius: 14, borderBottomLeftRadius: 14 }} />
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginLeft: 6 }}>
+                        <span style={{ fontSize: 24 }}>🌱</span>
+                        <div style={{ fontSize: 11.5, fontWeight: 800, color: '#ffffff', lineHeight: 1.3 }}>
+                          Focus on the 1% today. Your daily rituals define you.
+                        </div>
+                        <div style={{ fontSize: 9.5, color: '#10b981', fontWeight: 'bold', marginTop: 2 }}>
+                          ⚡ Tap to update streak
+                        </div>
+                      </div>
+                    </div>
+
+                    <p style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                      Place this shortcut widget on your homescreen for instant access! A single tap takes you straight into your vault to log today's rituals and keep streaks alive.
+                    </p>
+
+                    {/* Step by Step Guide */}
+                    <div style={{ padding: '8px 12px', background: 'var(--bg-elevated)', borderRadius: 10, border: '1px solid var(--border)', fontSize: 10, color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ fontWeight: 800, color: 'var(--text-primary)', marginBottom: 2 }}>How to Add to Home Screen:</div>
+                      <div>1. Go to device homescreen and long press empty space.</div>
+                      <div>2. Select <strong>Widgets</strong> from menu options.</div>
+                      <div>3. Look for <strong>Hab</strong>, select card, and drag onto screen!</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Milestone Unlock Celebration Modal ── */}
+            {unlockedMilestoneData && (
+              <div style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+                onClick={() => setUnlockedMilestoneData(null)}>
+                <div className="card float-animation" style={{
+                  maxWidth: 320,
+                  width: '100%',
+                  textAlign: 'center',
+                  padding: '32px 24px',
+                  border: '2px solid var(--accent)',
+                  background: 'linear-gradient(to bottom, var(--bg-card) 0%, var(--accent-dim) 100%)',
+                  boxShadow: '0 0 40px var(--accent-glow)',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }} onClick={e => e.stopPropagation()}>
+                  
+                  {/* Subtle glowing particle effect backing */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '-30%',
+                    left: '-30%',
+                    width: '160%',
+                    height: '160%',
+                    background: 'radial-gradient(circle, var(--accent) 0%, transparent 60%)',
+                    opacity: 0.15,
+                    pointerEvents: 'none'
+                  }} />
+
+                  <div style={{ fontSize: 72, marginBottom: 16, filter: 'drop-shadow(0 0 10px var(--accent))' }}>
+                    {unlockedMilestoneData.icon}
+                  </div>
+                  
+                  <span className="badge badge-accent" style={{ fontSize: 9, letterSpacing: '0.12em', padding: '4px 10px', textTransform: 'uppercase', marginBottom: 12 }}>Milestone Achieved!</span>
+                  
+                  <h3 style={{ fontSize: 22, fontWeight: 950, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: 6 }}>
+                    {unlockedMilestoneData.title}
+                  </h3>
+                  
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500, padding: '0 8px', marginBottom: 20, lineHeight: 1.5 }}>
+                    "{unlockedMilestoneData.desc}"
+                  </p>
+
+                  <div style={{
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-active)',
+                    borderRadius: 12,
+                    padding: '8px 16px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    marginBottom: 24
+                  }}>
+                    <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--accent)' }}>+{unlockedMilestoneData.xpReward} XP</span>
+                    <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Claimed</span>
+                  </div>
+
+                  <button className="btn-primary" style={{ width: '100%' }} onClick={() => setUnlockedMilestoneData(null)}>
+                    Awesome! →
+                  </button>
+                </div>
+              </div>
+            )}
 
           </div>
         </div>
