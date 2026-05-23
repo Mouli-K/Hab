@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "121711657972",
+    "project_id": "habt-d755a",
+    "storage_bucket": "habt-d755a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:121711657972:android:eefa5d9d29ce2bae916fa1",
+        "android_client_info": {
+          "package_name": "com.hab"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "121711657972-hefsu17as0bvt7s5il23ec7dhd5esv27.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.hab",
+            "certificate_hash": "72a8822d2808c2063e6647cebbf555bde5b00ddd"
+          }
+        },
+        {
+          "client_id": "121711657972-a93j7hqns0h1jmob2or55juv77m6b938.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAQfZS_t3eXWxEcMCHrFbKPduqgkgS5kS0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "121711657972-a93j7hqns0h1jmob2or55juv77m6b938.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,5 @@
+{
+  "appId": "io.hab.app",
+  "appName": "Hab",
+  "webDir": "dist"
+}

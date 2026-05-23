@@ -1,0 +1,1951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Hab — Atomic Habit Engine</title>
+  <meta name="description" content="Hab: Premium atomic habit tracker with streaks, gamification, and Firebase cloud sync.">
+
+  <!-- Google Fonts: Plus Jakarta Sans + Outfit + JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+  <!-- React 18 + Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Firebase Compat Layer -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <!-- Google Sign-In provider (OAuth) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js"></script>
+
+  <!-- Theme Init (Prevents FOUC) -->
+  <script>
+    (function() {
+      try {
+        var localTheme = localStorage.getItem('hab_theme');
+        var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (localTheme === 'dark' || (!localTheme && sysDark)) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <style>
+    /* ───────────── DESIGN TOKENS ───────────── */
+    :root, [data-theme="light"] {
+      /* Light Mode Default */
+      --bg: #f8fafc;
+      --bg-card: #ffffff;
+      --bg-elevated: #f1f5f9;
+      --border: rgba(0,0,0,0.08);
+      --border-active: rgba(30,80,255,0.4);
+      --accent: #1E50FF; /* Premium Electric Cobalt */
+      --accent-dim: rgba(30,80,255,0.08);
+      --accent-glow: rgba(30,80,255,0.18);
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #64748b;
+      --success: #22c55e;
+      --success-dim: rgba(34,197,94,0.12);
+      --danger: #ef4444;
+      --danger-dim: rgba(239,68,68,0.12);
+      --info: #0ea5e9;
+      --info-dim: rgba(14,165,233,0.1);
+      
+      --btn-primary-text: #ffffff;
+      --code-bg: #f1f5f9;
+      --code-text: #334155;
+      
+      --font-body: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      --font-display: 'Outfit', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --radius-sm: 10px;
+      --radius-md: 16px;
+      --radius-lg: 22px;
+      --radius-xl: 28px;
+      --bg-header-nav: rgba(255, 255, 255, 0.85);
+    }
+
+    [data-theme="dark"] {
+      --bg: #0e0f11;
+      --bg-card: #161719;
+      --bg-elevated: #1d1e21;
+      --border: rgba(255,255,255,0.07);
+      --border-active: rgba(79,128,255,0.4);
+      --accent: #4F80FF; /* Premium Sapphire Electric */
+      --accent-dim: rgba(79,128,255,0.12);
+      --accent-glow: rgba(79,128,255,0.18);
+      --text-primary: #F0F0F2;
+      --text-secondary: #8B8D9A;
+      --text-muted: #4A4C59;
+      --success: #4ADE80;
+      --success-dim: rgba(74,222,128,0.12);
+      --danger: #F87171;
+      --danger-dim: rgba(248,113,113,0.12);
+      --info: #38bdf8;
+      --info-dim: rgba(56,189,248,0.1);
+      
+      --btn-primary-text: #0e0f11;
+      --code-bg: #0a0b0d;
+      --code-text: #C8D0E0;
+      --bg-header-nav: rgba(14, 15, 17, 0.85);
+    }
+
+    /* ───────────── RESET & BASE ───────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      overscroll-behavior-y: contain;
+      -webkit-tap-highlight-color: transparent;
+      font-size: 14px;
+    }
+
+    h1, h2, h3, h4, h5, h6, .btn-primary, .btn-ghost, .btn-danger, .label, .section-header, .tab-seg-btn, .nav-btn {
+      font-family: var(--font-display) !important;
+    }
+
+    input, textarea, select {
+      -webkit-user-select: text;
+      user-select: text;
+      font-size: 16px !important;
+      font-family: var(--font-body);
+      color: var(--text-primary);
+    }
+
+    /* ───────────── SAFE AREAS ───────────── */
+    .safe-top { padding-top: env(safe-area-inset-top, 16px); }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 20px); }
+
+    /* ───────────── SCROLLBARS ───────────── */
+    .no-scroll::-webkit-scrollbar { display: none; }
+    .no-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* ───────────── ANIMATIONS ───────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse-ring {
+      0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+      50% { box-shadow: 0 0 0 8px transparent; }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes checkDraw {
+      to { stroke-dashoffset: 0; }
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to   { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes glow-pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+    @keyframes indicator-slide {
+      from { transform: scaleX(0); }
+      to   { transform: scaleX(1); }
+    }
+
+    .animate-fade-up { animation: fadeUp 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    .animate-slide-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+    /* ───────────── INTERACTIVE ───────────── */
+    .pressable { transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.12s; }
+    .pressable:active { transform: scale(0.95); opacity: 0.85; }
+
+    /* ───────────── CARDS ───────────── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+    }
+    .card-elevated {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+    }
+
+    /* ───────────── BUTTONS ───────────── */
+    .btn-primary {
+      background: var(--accent);
+      color: var(--btn-primary-text);
+      font-weight: 700;
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 13px 20px;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      width: 100%;
+      transition: opacity 0.15s, transform 0.12s;
+    }
+    .btn-primary:active { transform: scale(0.97); opacity: 0.9; }
+
+    .btn-ghost {
+      background: var(--bg-elevated);
+      color: var(--text-secondary);
+      font-weight: 700;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 20px;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      width: 100%;
+      transition: all 0.15s;
+    }
+    .btn-ghost:active { transform: scale(0.97); }
+    .btn-ghost:hover { border-color: var(--border-active); color: var(--accent); }
+
+    .btn-danger {
+      background: var(--danger-dim);
+      color: var(--danger);
+      font-weight: 700;
+      border: 1px solid rgba(248,113,113,0.2);
+      border-radius: var(--radius-md);
+      padding: 10px 16px;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-danger:hover { background: rgba(248,113,113,0.2); }
+    .btn-danger:active { transform: scale(0.96); }
+
+    /* ───────────── INPUTS ───────────── */
+    .input-field {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      font-size: 14px;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .input-field:focus {
+      border-color: var(--border-active);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+    .input-field::placeholder { color: var(--text-muted); }
+
+    textarea.input-field { resize: none; line-height: 1.5; }
+    select.input-field { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238B8D9A' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
+
+    /* ───────────── LABEL ───────────── */
+    .label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    /* ───────────── BADGE ───────────── */
+    .badge {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+    }
+    .badge-accent { background: var(--accent-dim); color: var(--accent); border: 1px solid var(--border-active); }
+    .badge-success { background: var(--success-dim); color: var(--success); }
+    .badge-muted { background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border); }
+    .badge-danger { background: var(--danger-dim); color: var(--danger); }
+
+    /* ───────────── CHECKMARK ───────────── */
+    .checkmark-path {
+      stroke-dasharray: 22;
+      stroke-dashoffset: 22;
+      transition: stroke-dashoffset 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .checked .checkmark-path { stroke-dashoffset: 0; }
+
+    /* ───────────── PROGRESS RING ───────────── */
+    .progress-ring-circle {
+      transition: stroke-dashoffset 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      transform: rotate(-90deg);
+      transform-origin: 50% 50%;
+    }
+
+    /* ───────────── TOAST ───────────── */
+    .toast {
+      position: fixed;
+      bottom: 92px;
+      left: 16px;
+      right: 16px;
+      z-index: 9999;
+      padding: 14px 16px;
+      border-radius: var(--radius-md);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      animation: fadeUp 0.3s ease forwards;
+      backdrop-filter: blur(20px);
+    }
+    .toast-success { background: rgba(74,222,128,0.15); border: 1px solid rgba(74,222,128,0.3); color: var(--success); }
+    .toast-error { background: rgba(248,113,113,0.15); border: 1px solid rgba(248,113,113,0.3); color: var(--danger); }
+    .toast-info { background: rgba(255,183,77,0.12); border: 1px solid rgba(255,183,77,0.25); color: var(--accent); }
+
+    /* ───────────── HEADER ───────────── */
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: var(--bg-header-nav);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ───────────── BOTTOM NAV ───────────── */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 480px;
+      z-index: 40;
+      background: var(--bg-header-nav);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+    }
+
+    .nav-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 4px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: color 0.2s;
+      gap: 4px;
+      position: relative;
+    }
+    .nav-btn.active { color: var(--accent); }
+    .nav-btn.active::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 20%;
+      right: 20%;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 0 0 4px 4px;
+      animation: indicator-slide 0.2s ease forwards;
+    }
+
+    /* ───────────── HABIT CARD ───────────── */
+    .habit-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      transition: border-color 0.2s;
+      animation: fadeUp 0.3s ease forwards;
+    }
+    .habit-card.complete {
+      border-color: rgba(74,222,128,0.25);
+      background: linear-gradient(135deg, var(--bg-card) 0%, rgba(74,222,128,0.04) 100%);
+    }
+
+    /* ───────────── CHECKBOX BUTTON ───────────── */
+    .check-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      color: transparent;
+      flex-shrink: 0;
+    }
+    .check-btn.complete {
+      background: var(--success);
+      border-color: var(--success);
+      color: var(--btn-primary-text);
+      box-shadow: 0 0 14px rgba(74,222,128,0.3);
+    }
+    .check-btn:not(.complete):hover { border-color: var(--success); }
+
+    /* ───────────── NUMERIC STEPPER ───────────── */
+    .stepper {
+      display: flex;
+      align-items: center;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+    .stepper-btn {
+      width: 36px;
+      height: 36px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+    .stepper-btn:active { background: var(--accent-dim); color: var(--accent); }
+    .stepper-btn:disabled { opacity: 0.3; cursor: default; }
+    .stepper-val {
+      min-width: 36px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--text-primary);
+    }
+
+    /* ───────────── PROGRESS BAR ───────────── */
+    .progress-bar {
+      height: 4px;
+      background: var(--bg-elevated);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* ───────────── CALENDAR CELL ───────────── */
+    .cal-cell {
+      aspect-ratio: 1;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .cal-cell:hover { border-color: var(--border-active); color: var(--accent); }
+    .cal-cell.done { border-color: transparent; color: var(--bg); font-weight: 900; }
+    .cal-cell.today { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+    .cal-cell.today.done { background: var(--accent); color: var(--btn-primary-text); border-color: transparent; }
+    .cal-cell.blank { background: transparent; border-color: transparent; cursor: default; }
+
+    /* ───────────── LEVEL LADDER ───────────── */
+    .level-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      position: relative;
+      transition: all 0.2s;
+    }
+    .level-row.current {
+      border-color: var(--border-active);
+      background: linear-gradient(135deg, var(--bg-elevated), var(--accent-dim));
+    }
+    .level-row.unlocked { opacity: 0.55; }
+    .level-row.locked { opacity: 0.25; border-style: dashed; }
+
+    /* ───────────── MODAL ───────────── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 0;
+    }
+    .modal-panel {
+      background: var(--bg-card);
+      border-top: 1px solid var(--border);
+      border-radius: 24px 24px 0 0;
+      width: 100%;
+      max-width: 480px;
+      padding: 20px 20px env(safe-area-inset-bottom, 20px);
+      max-height: 88vh;
+      overflow-y: auto;
+      animation: slideUp 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .modal-panel::-webkit-scrollbar { display: none; }
+
+    /* ───────────── CODE BLOCK ───────────── */
+    .code-block {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      line-height: 1.7;
+      color: var(--code-text);
+      overflow-x: auto;
+    }
+    .code-comment { color: #4A5568; }
+    .code-keyword { color: var(--accent); font-weight: 700; }
+    .code-string { color: var(--success); }
+    .code-cmd { color: #60A5FA; }
+
+    /* ───────────── AUTH SCREEN ───────────── */
+    .auth-screen {
+      min-height: 100dvh;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .auth-card {
+      width: 100%;
+      max-width: 360px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 28px 24px;
+      animation: fadeUp 0.4s ease forwards;
+    }
+
+    /* ───────────── SECTION HEADER ───────────── */
+    .section-header {
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    /* ───────────── DIVIDER ───────────── */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ───────────── TAB SEGMENT ───────────── */
+    .tab-segment {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      display: flex;
+      padding: 3px;
+      gap: 2px;
+    }
+    .tab-seg-btn {
+      flex: 1;
+      padding: 8px 4px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border: none;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab-seg-btn.active {
+      background: var(--bg-elevated);
+      color: var(--accent);
+      border: 1px solid var(--border-active);
+    }
+
+    /* ───────────── COLOR SWATCHES ───────────── */
+    .swatch {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .swatch.selected {
+      transform: scale(1.15);
+      box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--accent);
+    }
+
+    /* ───────────── XP BAR ───────────── */
+    .xp-bar {
+      height: 6px;
+      background: var(--bg);
+      border-radius: 3px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .xp-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--info));
+      border-radius: 3px;
+      transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    /* ───────────── STREAK PILL ───────────── */
+    .streak-pill {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      background: rgba(255,183,77,0.1);
+      color: var(--accent);
+      border: 1px solid rgba(255,183,77,0.2);
+      border-radius: 20px;
+      padding: 3px 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    /* ───────────── ICON PICKER ───────────── */
+    .icon-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .icon-btn.selected {
+      border-color: var(--border-active);
+      background: var(--accent-dim);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+
+    /* App layout */
+    .app-layout {
+      max-width: 480px;
+      margin: 0 auto;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+
+    main { flex: 1; overflow-y: auto; padding: 16px; padding-bottom: 96px; }
+    main::-webkit-scrollbar { display: none; }
+
+    /* ───────────── LOADING SCREEN ───────────── */
+    .loader-spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+    /* ─── Firebase Init ─── */
+    const CUSTOM_FIREBASE_CONFIG = {
+      apiKey:            "AIzaSyANzeWDUR-HmeTcwR7W4PX039MGggG8Y88",
+      authDomain:        "habt-d755a.firebaseapp.com",
+      projectId:         "habt-d755a",
+      storageBucket:     "habt-d755a.firebasestorage.app",
+      messagingSenderId: "121711657972",
+      appId:             "1:121711657972:web:ab1628140b60c7e9916fa1",
+      measurementId:     "G-5KBN35YBXN"
+    };
+
+    let app, auth, db;
+    let firebaseAvailable = false;
+    let appId = 'hab-prod-app';
+
+    try {
+      let config = CUSTOM_FIREBASE_CONFIG;
+      if (config) {
+        app = firebase.initializeApp(config);
+        auth = firebase.auth();
+        db = firebase.firestore();
+        appId = typeof __app_id !== 'undefined' ? __app_id : 'hab-prod-app';
+        firebaseAvailable = true;
+      }
+    } catch (e) {
+      console.warn('Firebase not configured — running in local storage mode.');
+    }
+
+    /* ─── Sound Engine ─── */
+    const sfx = (type, enabled) => {
+      if (!enabled) return;
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        const ctx = new Ctx();
+        const now = ctx.currentTime;
+
+        const play = (freq, type, gainStart, gainEnd, dur, start = 0) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, now + start);
+          gain.gain.setValueAtTime(gainStart, now + start);
+          gain.gain.exponentialRampToValueAtTime(gainEnd, now + start + dur);
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.start(now + start); osc.stop(now + start + dur + 0.01);
+        };
+
+        if (type === 'complete') {
+          play(1046.5, 'sine', 0.07, 0.001, 0.32);
+          play(2093, 'sine', 0.03, 0.001, 0.1);
+        } else if (type === 'levelup') {
+          [523.25, 659.25, 783.99, 1046.5, 1318.51].forEach((f, i) => play(f, 'sine', 0.04, 0.001, 0.22, i * 0.065));
+        } else if (type === 'click') {
+          play(400, 'sine', 0.02, 0.001, 0.04);
+        } else if (type === 'error') {
+          play(200, 'sawtooth', 0.03, 0.001, 0.08);
+          play(160, 'sawtooth', 0.02, 0.001, 0.08, 0.09);
+        }
+      } catch (_) {}
+    };
+
+    const haptic = (p) => navigator.vibrate && navigator.vibrate(p);
+
+    /* ─── Constants ─── */
+    const QUOTES = [
+      { text: "We are what we repeatedly do. Excellence, then, is not an act, but a habit.", author: "Aristotle" },
+      { text: "Small daily improvements over time lead to stunning results.", author: "Robin Sharma" },
+      { text: "Your reputation with yourself is built on keeping promises to yourself.", author: "Ed Mylett" },
+      { text: "Atomic habits yield monumental change. Focus on the 1% today.", author: "James Clear" },
+      { text: "Don't count the days. Make the days count.", author: "Muhammad Ali" },
+    ];
+
+    const LEVELS = [
+      { level: 1, title: 'Novice Tracker',      icon: '🌱', xp: 0 },
+      { level: 2, title: 'Habit Builder',        icon: '🛠️', xp: 120 },
+      { level: 3, title: 'Consistency Cadet',   icon: '🛡️', xp: 240 },
+      { level: 4, title: 'Streak Scout',         icon: '🗺️', xp: 480 },
+      { level: 5, title: 'Routine Officer',      icon: '⚔️', xp: 720 },
+      { level: 6, title: 'Discipline Elite',     icon: '🔥', xp: 1080 },
+      { level: 7, title: 'Mastery Sage',         icon: '🔮', xp: 1440 },
+      { level: 8, title: 'Ritual Sovereign',     icon: '👑', xp: 1920 },
+      { level: 9, title: 'Zenith Champion',      icon: '⚡', xp: 2400 },
+      { level: 10, title: 'Cosmic Exemplar',     icon: '✨', xp: 3000 },
+    ];
+
+    const AVATAR_ICONS = ['🎯','👑','⭐','🛡️','🔥','❤️','🏆','✨','⚡','🌙','🦋','🚀'];
+    const HABIT_COLORS = ['#FFB74D','#4ADE80','#60A5FA','#F472B6','#A78BFA','#FB923C','#34D399','#F87171'];
+
+    /* ─── Helpers ─── */
+    const todayStr = () => new Date().toISOString().split('T')[0];
+    const dateStr = (d) => d.toISOString().split('T')[0];
+
+    /* ══════════════════════════════════════
+       MAIN APP COMPONENT
+    ══════════════════════════════════════ */
+    function App() {
+      const [user, setUser] = useState(null);
+      const [authLoading, setAuthLoading] = useState(true);
+      const [authName, setAuthName] = useState('');
+      const [authEmail, setAuthEmail] = useState('');
+      const [authPassword, setAuthPassword] = useState('');
+      const [authMode, setAuthMode] = useState('login');
+      const [toast, setToast] = useState(null);
+      const [activeTab, setActiveTab] = useState('dashboard');
+      const [soundOn, setSoundOn] = useState(true);
+      const [theme, setTheme] = useState(() => {
+        return document.documentElement.getAttribute('data-theme') || 'light';
+      });
+
+      const [habits, setHabits] = useState([]);
+      const [history, setHistory] = useState({});
+      const [selectedDate, setSelectedDate] = useState(todayStr());
+      const [analyticsYear, setAnalyticsYear] = useState(new Date().getFullYear());
+      const [analyticsMonth, setAnalyticsMonth] = useState(new Date().getMonth());
+
+      const [profile, setProfile] = useState({ name: 'Explorer', level: 1, xp: 0, title: 'Novice Tracker', avatarIcon: '🏆', avatarBg: '#1d1e21' });
+      const [showAddModal, setShowAddModal] = useState(false);
+      const [editHabit, setEditHabit] = useState(null);
+      const [levelUpData, setLevelUpData] = useState(null);
+      const [quote, setQuote] = useState(QUOTES[0].text);
+      const [editingQuote, setEditingQuote] = useState(false);
+
+      const touchStart = useRef(0);
+      const touchEnd   = useRef(0);
+
+      const showToast = useCallback((text, type = 'info') => {
+        setToast({ text, type });
+        setTimeout(() => setToast(null), 3200);
+      }, []);
+
+      /* ── Auth init ── */
+      useEffect(() => {
+        setQuote(QUOTES[Math.floor(Math.random() * QUOTES.length)].text);
+
+        if (!firebaseAvailable) {
+          const stored = localStorage.getItem('hab_user_v5');
+          if (stored) setUser(JSON.parse(stored));
+          setTimeout(() => setAuthLoading(false), 380);
+          return;
+        }
+
+        const unsub = auth.onAuthStateChanged(u => { setUser(u); setAuthLoading(false); });
+        return unsub;
+      }, []);
+
+      /* ── Data load ── */
+      useEffect(() => {
+        if (authLoading || !user) { setHabits([]); setHistory({}); return; }
+        const uid = user.uid || user.id;
+
+        if (!firebaseAvailable) {
+          const h = localStorage.getItem(`hab_habits_v5_${uid}`);
+          const hi = localStorage.getItem(`hab_history_v5_${uid}`);
+          const p = localStorage.getItem(`hab_profile_v5_${uid}`);
+          if (h) setHabits(JSON.parse(h));
+          if (hi) setHistory(JSON.parse(hi));
+          if (p) setProfile(JSON.parse(p));
+          return;
+        }
+
+        const base = db.collection('artifacts').doc(appId).collection('users').doc(uid);
+        const u1 = base.collection('habits').onSnapshot(s => { const a = []; s.forEach(d => a.push({ id: d.id, ...d.data() })); setHabits(a); });
+        const u2 = base.collection('history').doc('logs').onSnapshot(d => setHistory(d.exists ? d.data() : {}));
+        const u3 = base.collection('profile').doc('data').onSnapshot(d => {
+          if (d.exists) { setProfile(d.data()); }
+          else {
+            const def = { name: user.displayName || authName.trim() || (user.email ? user.email.split('@')[0] : 'Explorer'), level: 1, xp: 0, title: 'Novice Tracker', avatarIcon: '🏆', avatarBg: '#1d1e21' };
+            setProfile(def);
+            base.collection('profile').doc('data').set(def);
+          }
+        });
+        return () => { u1(); u2(); u3(); };
+      }, [user, authLoading]);
+
+      /* ── Persist ── */
+      const persist = async (habs, hist, prof) => {
+        if (!user) return;
+        const uid = user.uid || user.id;
+        if (!firebaseAvailable) {
+          if (habs) localStorage.setItem(`hab_habits_v5_${uid}`, JSON.stringify(habs));
+          if (hist) localStorage.setItem(`hab_history_v5_${uid}`, JSON.stringify(hist));
+          if (prof) localStorage.setItem(`hab_profile_v5_${uid}`, JSON.stringify(prof));
+          return;
+        }
+        const base = db.collection('artifacts').doc(appId).collection('users').doc(uid);
+        try {
+          if (hist) await base.collection('history').doc('logs').set(hist);
+          if (prof) await base.collection('profile').doc('data').set(prof);
+        } catch(e) { console.error('Sync error:', e); }
+      };
+
+      /* ── Theme Toggle ── */
+      const toggleTheme = () => {
+        sfx('click', soundOn);
+        haptic(25);
+        const next = theme === 'light' ? 'dark' : 'light';
+        setTheme(next);
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('hab_theme', next);
+      };
+
+      /* ── Swipe ── */
+      const onTouchStart = e => { touchStart.current = e.targetTouches[0].clientX; };
+      const onTouchMove  = e => { touchEnd.current = e.targetTouches[0].clientX; };
+      const onTouchEnd   = () => {
+        const diff = touchStart.current - touchEnd.current;
+        if (Math.abs(diff) < 60) return;
+        const cur = new Date(selectedDate);
+        if (diff > 0) {
+          const next = new Date(cur); next.setDate(cur.getDate() + 1);
+          if (dateStr(next) <= todayStr()) { setSelectedDate(dateStr(next)); haptic(25); sfx('click', soundOn); }
+        } else {
+          const prev = new Date(cur); prev.setDate(cur.getDate() - 1);
+          setSelectedDate(dateStr(prev)); haptic(25); sfx('click', soundOn);
+        }
+      };
+
+      /* ── Auth handlers ── */
+      const handleAuth = async (e) => {
+        e.preventDefault();
+        if (!authEmail.trim() || !authPassword.trim()) { showToast('Fill in all fields', 'error'); return; }
+        if (authMode === 'register' && !authName.trim()) { showToast('Add a display name', 'error'); return; }
+        setAuthLoading(true);
+        sfx('click', soundOn);
+        try {
+          if (authMode === 'register') {
+            if (firebaseAvailable) {
+              const cred = await auth.createUserWithEmailAndPassword(authEmail, authPassword);
+              const init = { name: authName.trim(), level: 1, xp: 10, title: 'Novice Tracker', avatarIcon: '🏆', avatarBg: '#1d1e21' };
+              await db.collection('artifacts').doc(appId).collection('users').doc(cred.user.uid).collection('profile').doc('data').set(init);
+            } else {
+              const mu = { id: 'u-' + Date.now(), uid: 'u-' + Date.now(), email: authEmail };
+              localStorage.setItem('hab_user_v5', JSON.stringify(mu));
+              localStorage.setItem(`hab_profile_v5_${mu.uid}`, JSON.stringify({ name: authName.trim(), level: 1, xp: 10, title: 'Novice Tracker', avatarIcon: '🏆', avatarBg: '#1d1e21' }));
+              setUser(mu);
+            }
+            showToast(`Welcome, ${authName}! 🎉`, 'success');
+          } else {
+            if (firebaseAvailable) { await auth.signInWithEmailAndPassword(authEmail, authPassword); }
+            else {
+              const mu = { id: 'local', uid: 'local', email: authEmail };
+              localStorage.setItem('hab_user_v5', JSON.stringify(mu));
+              setUser(mu);
+            }
+            showToast('Signed in successfully', 'success');
+          }
+        } catch(err) { showToast(err.message, 'error'); sfx('error', soundOn); }
+        finally { setAuthLoading(false); }
+      };
+
+      const handleGuest = async () => {
+        setAuthLoading(true);
+        sfx('click', soundOn);
+        try {
+          if (firebaseAvailable) { await auth.signInAnonymously(); }
+          else {
+            const g = { id: 'guest', uid: 'guest', email: 'guest@hab.io' };
+            localStorage.setItem('hab_user_v5', JSON.stringify(g));
+            setUser(g);
+          }
+          showToast('Guest session started 👤', 'info');
+        } catch(err) { showToast(err.message, 'error'); }
+        finally { setAuthLoading(false); }
+      };
+
+      /* ── Google Sign-In ── */
+      const handleGoogle = async () => {
+        sfx('click', soundOn);
+        haptic(40);
+        setAuthLoading(true);
+        try {
+          if (firebaseAvailable) {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            provider.setCustomParameters({ prompt: 'select_account' });
+            const cred = await auth.signInWithPopup(provider);
+            const uid  = cred.user.uid;
+            const base = db.collection('artifacts').doc(appId).collection('users').doc(uid);
+            const profDoc = await base.collection('profile').doc('data').get();
+            if (!profDoc.exists) {
+              const init = {
+                name: cred.user.displayName || cred.user.email.split('@')[0],
+                level: 1, xp: 10, title: 'Novice Tracker',
+                avatarIcon: '🏆', avatarBg: '#1d1e21'
+              };
+              await base.collection('profile').doc('data').set(init);
+            }
+            showToast(`Welcome, ${cred.user.displayName || 'there'}! 🎉`, 'success');
+          } else {
+            showToast('Google Sign-In requires Firebase connection', 'error');
+          }
+        } catch(err) {
+          if (err.code === 'auth/popup-closed-by-user') {
+            showToast('Sign-in cancelled', 'info');
+          } else {
+            showToast(err.message, 'error');
+            sfx('error', soundOn);
+          }
+        } finally { setAuthLoading(false); }
+      };
+
+      const handleSignOut = async () => {
+        sfx('click', soundOn);
+        haptic(40);
+        if (firebaseAvailable) { await auth.signOut(); }
+        else { localStorage.removeItem('hab_user_v5'); setUser(null); }
+        showToast('Signed out', 'info');
+      };
+
+      /* ── XP & Leveling ── */
+      const addXP = (amount) => {
+        const up = { ...profile };
+        let xp = up.xp + amount;
+        let lvl = up.level;
+        let didLevel = false;
+        while (xp >= 120 * lvl && lvl < 10) { xp -= 120 * lvl; lvl++; didLevel = true; }
+        if (xp < 0) xp = 0;
+        up.xp = xp; up.level = lvl;
+        const match = LEVELS.find(l => l.level === lvl);
+        if (match) up.title = match.title;
+        if (didLevel) {
+          setLevelUpData({ level: lvl, title: up.title, icon: match?.icon });
+          haptic([80,40,80,40,100]);
+          setTimeout(() => sfx('levelup', soundOn), 80);
+        } else { haptic(35); }
+        setProfile(up);
+        persist(null, null, up);
+      };
+
+      /* ── Streak ── */
+      const calcStreak = (habitId, hist) => {
+        const logs = hist[habitId] || {};
+        const habit = habits.find(h => h.id === habitId);
+        if (!habit) return 0;
+        let streak = 0;
+        const check = new Date();
+        while (true) {
+          const ds = dateStr(check);
+          const val = logs[ds] || 0;
+          if (val >= (habit.targetValue || 1)) { streak++; check.setDate(check.getDate() - 1); }
+          else if (ds === todayStr()) { check.setDate(check.getDate() - 1); continue; }
+          else break;
+        }
+        return streak;
+      };
+
+      /* ── Toggle habit ── */
+      const toggleHabit = async (habitId, date, increment = true) => {
+        const habit = habits.find(h => h.id === habitId);
+        if (!habit) return;
+        const logs = { ...(history[habitId] || {}) };
+        const cur = logs[date] || 0;
+        let next = habit.type === 'checkbox' ? (cur > 0 ? 0 : 1) : Math.max(0, cur + (increment ? 1 : -1));
+
+        const wasDone = cur >= habit.targetValue;
+        const isDone  = next >= habit.targetValue;
+
+        if (!wasDone && isDone) { sfx('complete', soundOn); addXP(25); }
+        else if (wasDone && !isDone) { sfx('click', soundOn); addXP(-25); }
+        else if (habit.type === 'numeric' && increment && !isDone) { sfx('click', soundOn); addXP(5); }
+        else { sfx('click', soundOn); }
+
+        const newHist = { ...history, [habitId]: { ...logs, [date]: next } };
+        setHistory(newHist);
+
+        const streak = calcStreak(habitId, newHist);
+        const newHabits = habits.map(h => h.id === habitId ? { ...h, streak, maxStreak: Math.max(h.maxStreak || 0, streak) } : h);
+        setHabits(newHabits);
+
+        if (firebaseAvailable && user) {
+          const uid = user.uid || user.id;
+          await db.collection('artifacts').doc(appId).collection('users').doc(uid).collection('habits').doc(habitId).update({ streak, maxStreak: Math.max(habit.maxStreak || 0, streak) });
+        }
+        persist(newHabits, newHist, null);
+      };
+
+      /* ── Create habit ── */
+      const createHabit = async (data) => {
+        const id = 'h-' + Date.now();
+        const fresh = { id, streak: 0, maxStreak: 0, createdAt: todayStr(), ...data };
+        const updated = [...habits, fresh];
+        setHabits(updated);
+        setShowAddModal(false);
+        addXP(15);
+        sfx('complete', soundOn);
+        haptic([35,35,35]);
+        if (firebaseAvailable && user) {
+          const uid = user.uid || user.id;
+          await db.collection('artifacts').doc(appId).collection('users').doc(uid).collection('habits').doc(id).set(fresh);
+        }
+        persist(updated, null, null);
+        showToast('Habit created 🌱', 'success');
+      };
+
+      /* ── Update habit ── */
+      const updateHabit = async (data) => {
+        const updated = habits.map(h => h.id === data.id ? { ...h, ...data } : h);
+        setHabits(updated);
+        setEditHabit(null);
+        sfx('click', soundOn);
+        if (firebaseAvailable && user) {
+          const uid = user.uid || user.id;
+          await db.collection('artifacts').doc(appId).collection('users').doc(uid).collection('habits').doc(data.id).set(data);
+        }
+        persist(updated, null, null);
+        showToast('Habit updated', 'success');
+      };
+
+      /* ── Delete habit ── */
+      const deleteHabit = async (habitId) => {
+        const updated = habits.filter(h => h.id !== habitId);
+        const copyHist = { ...history }; delete copyHist[habitId];
+        setHabits(updated); setHistory(copyHist); setEditHabit(null);
+        sfx('click', soundOn); haptic([50,50]);
+        if (firebaseAvailable && user) {
+          const uid = user.uid || user.id;
+          await db.collection('artifacts').doc(appId).collection('users').doc(uid).collection('habits').doc(habitId).delete();
+        }
+        persist(updated, copyHist, null);
+        showToast('Habit deleted', 'info');
+      };
+
+      /* ── Analytics ── */
+      const analytics = useMemo(() => {
+        let total = 0, bestStreak = 0;
+        Object.keys(history).forEach(hid => {
+          const tgt = habits.find(h => h.id === hid);
+          if (!tgt) return;
+          Object.values(history[hid]).forEach(v => { if (v >= tgt.targetValue) total++; });
+        });
+        habits.forEach(h => { if (h.maxStreak > bestStreak) bestStreak = h.maxStreak; });
+        return { total, bestStreak, count: habits.length };
+      }, [habits, history]);
+
+      /* ── Today progress ── */
+      const todayProgress = useMemo(() => {
+        if (!habits.length) return 0;
+        const done = habits.filter(h => (history[h.id]?.[selectedDate] || 0) >= h.targetValue).length;
+        return Math.round((done / habits.length) * 100);
+      }, [habits, history, selectedDate]);
+
+      /* ── Calendar grid ── */
+      const calGrid = useMemo(() => {
+        const dim = new Date(analyticsYear, analyticsMonth + 1, 0).getDate();
+        const start = new Date(analyticsYear, analyticsMonth, 1).getDay();
+        const blanks = Array(start).fill(null);
+        const days = Array.from({ length: dim }, (_, i) => {
+          const d = i + 1;
+          const mm = String(analyticsMonth + 1).padStart(2, '0');
+          const dd = String(d).padStart(2, '0');
+          return { day: d, ds: `${analyticsYear}-${mm}-${dd}` };
+        });
+        return [...blanks, ...days];
+      }, [analyticsYear, analyticsMonth]);
+
+      /* ─── LOADING ─── */
+      if (authLoading) return (
+        <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+          <div style={{ fontSize: 32 }}>🌱</div>
+          <div className="loader-spinner"></div>
+          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>Syncing Vault...</p>
+        </div>
+      );
+
+      /* ─── AUTH SCREEN ─── */
+      if (!user) return (
+        <div className="auth-screen safe-top safe-bottom">
+          <div className="auth-card">
+            {/* Logo */}
+            <div style={{ textAlign: 'center', marginBottom: 28 }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🌱</div>
+              <h1 style={{ fontSize: 28, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.02em', lineHeight: 1 }}>Hab</h1>
+              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--text-muted)', marginTop: 6, fontFamily: 'var(--font-mono)' }}>Atomic Routine Engine</p>
+            </div>
+
+            {/* Mode toggle */}
+            <div className="tab-segment" style={{ marginBottom: 24 }}>
+              <button className={`tab-seg-btn ${authMode === 'login' ? 'active' : ''}`} onClick={() => { sfx('click', soundOn); setAuthMode('login'); }}>Sign In</button>
+              <button className={`tab-seg-btn ${authMode === 'register' ? 'active' : ''}`} onClick={() => { sfx('click', soundOn); setAuthMode('register'); }}>Register</button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {authMode === 'register' && (
+                <div>
+                  <label className="label">Display Name</label>
+                  <input className="input-field" type="text" placeholder="e.g. Alex" required value={authName} onChange={e => setAuthName(e.target.value)} />
+                </div>
+              )}
+              <div>
+                <label className="label">Email Address</label>
+                <input className="input-field" type="email" placeholder="you@domain.com" required value={authEmail} onChange={e => setAuthEmail(e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Password</label>
+                <input className="input-field" type="password" placeholder="••••••••" required value={authEmail} onChange={e => setAuthEmail(e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Password</label>
+                <input className="input-field" type="password" placeholder="••••••••" required value={authPassword} onChange={e => setAuthPassword(e.target.value)} />
+              </div>
+              <button type="submit" className="btn-primary" style={{ marginTop: 4 }}>
+                {authMode === 'register' ? 'Create Account' : 'Access Vault'}
+              </button>
+            </form>
+
+            <div className="divider" style={{ marginTop: 20, marginBottom: 16 }}>or continue with</div>
+
+            {/* Google Sign-In */}
+            <button
+              type="button"
+              onClick={handleGoogle}
+              style={{
+                width: '100%', padding: '12px 16px',
+                background: '#fff', color: '#1f1f1f',
+                border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                fontWeight: 700, fontSize: 13,
+                transition: 'opacity 0.15s, transform 0.12s', marginBottom: 10
+              }}
+              className="pressable"
+            >
+              {/* Google 'G' logo SVG */}
+              <svg width="18" height="18" viewBox="0 0 48 48">
+                <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+                <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+                <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0124 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
+                <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 01-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+              </svg>
+              Sign in with Google
+            </button>
+
+            {/* Anonymous / Guest */}
+            <button
+              type="button"
+              className="pressable"
+              onClick={handleGuest}
+              style={{
+                width: '100%', padding: '12px 16px',
+                background: 'var(--bg-elevated)', color: 'var(--text-muted)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                fontWeight: 700, fontSize: 12,
+                letterSpacing: '0.06em', textTransform: 'uppercase'
+              }}
+            >
+              👤 Continue as Guest
+            </button>
+          </div>
+
+          {toast && <div className={`toast toast-${toast.type}`}>{toast.text}</div>}
+        </div>
+      );
+
+      /* ─── MAIN APP ─── */
+      const isToday = selectedDate === todayStr();
+      const r = 32, circ = 2 * Math.PI * r;
+      const offset = circ - (todayProgress / 100) * circ;
+
+      return (
+        <div style={{ background: 'var(--bg)', minHeight: '100dvh' }}>
+          <div className="app-layout">
+
+            {/* ── Header ── */}
+            <header className="app-header safe-top">
+              <div style={{ padding: '0 16px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 22 }}>🌱</span>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: '-0.02em', color: 'var(--text-primary)', lineHeight: 1 }}>Hab</div>
+                    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>Personal Vault</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {/* Theme toggle */}
+                  <button className="pressable" onClick={toggleTheme}
+                    style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--bg-elevated)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                    {theme === 'light' ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                      </svg>
+                    ) : (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <circle cx="12" cy="12" r="5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                      </svg>
+                    )}
+                  </button>
+
+                  {/* Sound toggle */}
+                  <button className="pressable" onClick={() => { sfx('click', soundOn); setSoundOn(!soundOn); haptic(25); }}
+                    style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--bg-elevated)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: soundOn ? 'var(--accent)' : 'var(--text-muted)' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      {soundOn
+                        ? <><path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></>
+                        : <><path strokeLinecap="round" strokeLinejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" /></>
+                      }
+                    </svg>
+                  </button>
+
+                  {/* Sign out */}
+                  <button className="pressable" onClick={handleSignOut}
+                    style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--bg-elevated)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--danger)' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </header>
+
+            {/* ── Main Content ── */}
+            <main className="no-scroll animate-fade-up">
+
+              {/* ━━━━━━ TAB: DASHBOARD ━━━━━━ */}
+              {activeTab === 'dashboard' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                  {/* Welcome + Progress Ring */}
+                  <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <h2 style={{ fontSize: 17, fontWeight: 900, letterSpacing: '-0.02em' }}>Hello, {profile.name}! 👋</h2>
+                      <p style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4, fontWeight: 500 }}>
+                        {isToday ? "Let's track today's habits." : `Viewing ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                      </p>
+                      <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <span className="badge badge-muted" style={{ fontFamily: 'var(--font-mono)' }}>Lv.{profile.level}</span>
+                        <span className="badge badge-accent">{profile.title}</span>
+                      </div>
+                    </div>
+                    {/* SVG Progress Ring */}
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <svg width="80" height="80" viewBox="0 0 80 80">
+                        <circle cx="40" cy="40" r={r} fill="none" stroke="var(--border)" strokeWidth="5" />
+                        <circle cx="40" cy="40" r={r} fill="none" stroke="var(--accent)" strokeWidth="5"
+                          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+                          className="progress-ring-circle" />
+                      </svg>
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ fontSize: 16, fontWeight: 900, color: 'var(--accent)', lineHeight: 1 }}>{todayProgress}%</span>
+                        <span style={{ fontSize: 8, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>done</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quote Widget */}
+                  <div className="card" style={{ position: 'relative' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <span className="badge badge-muted">Focus Anchor</span>
+                      <button onClick={() => { sfx('click', soundOn); setEditingQuote(!editingQuote); }}
+                        style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: editingQuote ? 'var(--accent)' : 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                        {editingQuote ? '✓ Save' : 'Edit'}
+                      </button>
+                    </div>
+                    {editingQuote
+                      ? <textarea className="input-field" rows={2} value={quote} onChange={e => setQuote(e.target.value)} />
+                      : <p style={{ fontSize: 12, fontStyle: 'italic', lineHeight: 1.6, color: 'var(--text-secondary)', fontWeight: 500 }}>"{quote}"</p>
+                    }
+                  </div>
+
+                  {/* Date Carousel */}
+                  <div className="card" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} style={{ userSelect: 'none' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <div>
+                        <div className="section-header" style={{ marginBottom: 4 }}>Active Timeline</div>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>
+                          {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                        </div>
+                      </div>
+                      {isToday && <span className="badge badge-accent">Today</span>}
+                    </div>
+                    <div className="no-scroll" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+                      {[6,5,4,3,2,1,0].map(ago => {
+                        const d = new Date(); d.setDate(d.getDate() - ago);
+                        const ds = dateStr(d);
+                        const sel = selectedDate === ds;
+                        return (
+                          <button key={ago} className="pressable" onClick={() => { sfx('click', soundOn); setSelectedDate(ds); haptic(20); }}
+                            style={{ minWidth: 48, height: 54, borderRadius: 14, flexShrink: 0, border: sel ? 'none' : '1px solid var(--border)', background: sel ? 'var(--accent)' : 'var(--bg-elevated)', color: sel ? '#0e0f11' : 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, cursor: 'pointer', transition: 'all 0.2s' }}>
+                            <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.7 }}>{d.toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                            <span style={{ fontSize: 14, fontWeight: 900 }}>{d.getDate()}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Habit list header */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span className="section-header">Today's Habits ({habits.length})</span>
+                    <button className="pressable" onClick={() => { sfx('click', soundOn); setShowAddModal(true); haptic(30); }}
+                      style={{ padding: '8px 14px', background: 'var(--accent)', color: '#0e0f11', border: 'none', borderRadius: 10, fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontSize: 14, lineHeight: 1 }}>+</span> Add Habit
+                    </button>
+                  </div>
+
+                  {/* Habits list */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {habits.map(habit => {
+                      const val = history[habit.id]?.[selectedDate] || 0;
+                      const done = val >= habit.targetValue;
+                      const pct = Math.min(100, Math.round((val / habit.targetValue) * 100));
+                      return (
+                        <div key={habit.id} className={`habit-card ${done ? 'complete' : ''}`}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                            {/* Color dot + info */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                <span style={{ width: 10, height: 10, borderRadius: '50%', background: habit.color || 'var(--accent)', flexShrink: 0 }}></span>
+                                <h4 style={{ fontSize: 14, fontWeight: 800, color: done ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: done ? 'line-through' : 'none', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{habit.name}</h4>
+                                {habit.importance === 'high' && <span className="badge badge-danger">High</span>}
+                              </div>
+                              {habit.description && <p style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5, fontWeight: 500 }}>{habit.description}</p>}
+                              {habit.cue && (
+                                <div style={{ marginTop: 8, padding: '6px 10px', background: 'var(--bg-elevated)', borderRadius: 8, fontSize: 10, color: 'var(--text-muted)', fontWeight: 500 }}>
+                                  ⚡ <strong style={{ color: 'var(--text-secondary)' }}>Cue:</strong> {habit.cue}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Streak */}
+                            <div className="streak-pill" style={{ flexShrink: 0 }}>🔥 {habit.streak}d</div>
+                          </div>
+
+                          {/* Progress + Controls */}
+                          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div style={{ flex: 1 }}>
+                              {habit.type === 'numeric' && (
+                                <>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>Progress</span>
+                                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{val}/{habit.targetValue} {habit.unit}</span>
+                                  </div>
+                                  <div className="progress-bar">
+                                    <div className="progress-bar-fill" style={{ width: `${pct}%`, background: done ? 'var(--success)' : (habit.color || 'var(--accent)') }} />
+                                  </div>
+                                </>
+                              )}
+                              {habit.type === 'checkbox' && (
+                                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: done ? 'var(--success)' : 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                                  {done ? '✓ Completed' : 'Pending'}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Action buttons */}
+                            {habit.type === 'numeric' ? (
+                              <div className="stepper">
+                                <button className="stepper-btn" disabled={val === 0} onClick={() => { toggleHabit(habit.id, selectedDate, false); haptic(20); }}>−</button>
+                                <span className="stepper-val">{val}</span>
+                                <button className="stepper-btn" onClick={() => { toggleHabit(habit.id, selectedDate, true); haptic(20); }}>+</button>
+                              </div>
+                            ) : (
+                              <button className={`check-btn ${done ? 'checked complete' : ''} pressable`}
+                                onClick={() => { toggleHabit(habit.id, selectedDate); haptic(30); }}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" className="checkmark-path" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {habits.length === 0 && (
+                      <div style={{ textAlign: 'center', padding: '48px 20px', background: 'var(--bg-card)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-lg)' }}>
+                        <div style={{ fontSize: 36, marginBottom: 12 }}>🔭</div>
+                        <h4 style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>No habits yet</h4>
+                        <p style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>Create your first habit to start building your routine.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ━━━━━━ TAB: RITUALS ━━━━━━ */}
+              {activeTab === 'habits' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <h2 style={{ fontSize: 15, fontWeight: 900, letterSpacing: '-0.01em' }}>Configure Rituals</h2>
+                      <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>Customize targets & parameters.</p>
+                    </div>
+                    <button className="pressable" onClick={() => { sfx('click', soundOn); setShowAddModal(true); haptic(30); }}
+                      style={{ padding: '8px 14px', background: 'var(--accent)', color: '#0e0f11', border: 'none', borderRadius: 10, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>
+                      + Create
+                    </button>
+                  </div>
+
+                  {habits.map(habit => (
+                    <div key={habit.id} className="card pressable" style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+                      onClick={() => { sfx('click', soundOn); setEditHabit(habit); haptic(25); }}>
+                      <div style={{ width: 42, height: 42, background: habit.color || 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 16, color: '#0e0f11', flexShrink: 0, borderRadius: 12 }}>
+                        {habit.name[0]?.toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <h4 style={{ fontSize: 13, fontWeight: 800, letterSpacing: '-0.01em' }}>{habit.name}</h4>
+                          {habit.importance === 'high' && <span className="badge badge-danger">High</span>}
+                        </div>
+                        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>Target: {habit.targetValue} {habit.unit}</span>
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>Best: {habit.maxStreak}d</span>
+                        </div>
+                      </div>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  ))}
+
+                  {habits.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '48px 20px', background: 'var(--bg-card)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-lg)' }}>
+                      <div style={{ fontSize: 36, marginBottom: 12 }}>🔭</div>
+                      <h4 style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>No rituals registered</h4>
+                      <p style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>Add habits to configure and track here.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ━━━━━━ TAB: INSIGHTS ━━━━━━ */}
+              {activeTab === 'analytics' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                  {/* Stats row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                    {[
+                      { label: 'Total Logs', value: analytics.total },
+                      { label: 'Best Streak', value: `${analytics.bestStreak}d` },
+                      { label: 'Active', value: analytics.count }
+                    ].map(s => (
+                      <div key={s.label} className="card" style={{ textAlign: 'center', padding: 14 }}>
+                        <div className="section-header" style={{ marginBottom: 4 }}>{s.label}</div>
+                        <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--accent)', fontFamily: 'var(--font-mono)', lineHeight: 1 }}>{s.value}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Month picker */}
+                  <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <div className="section-header" style={{ marginBottom: 4 }}>Calendar Period</div>
+                      <div style={{ fontSize: 15, fontWeight: 800 }}>
+                        {new Date(analyticsYear, analyticsMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {[[-1,'◀'],[1,'▶']].map(([d, label]) => (
+                        <button key={d} className="pressable" onClick={() => {
+                          sfx('click', soundOn); haptic(20);
+                          let m = analyticsMonth + d, y = analyticsYear;
+                          if (m < 0) { m = 11; y--; } else if (m > 11) { m = 0; y++; }
+                          setAnalyticsMonth(m); setAnalyticsYear(y);
+                        }} style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13 }}>{label}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Calendars per habit */}
+                  <div className="section-header" style={{ marginTop: 4 }}>Individual Habit Calendars</div>
+
+                  {habits.map(habit => (
+                    <div key={habit.id} className="card">
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ width: 10, height: 10, borderRadius: '50%', background: habit.color || 'var(--accent)', flexShrink: 0 }}></span>
+                          <h4 style={{ fontSize: 12, fontWeight: 800 }}>{habit.name}</h4>
+                        </div>
+                        <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>Goal: {habit.targetValue} {habit.unit}</span>
+                      </div>
+
+                      {/* Day headers */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 3 }}>
+                        {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
+                          <div key={d} style={{ textAlign: 'center', fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--text-muted)', padding: '4px 0', fontFamily: 'var(--font-mono)' }}>{d}</div>
+                        ))}
+                      </div>
+
+                      {/* Calendar grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
+                        {calGrid.map((cell, idx) => {
+                          if (!cell) return <div key={`b-${idx}`} className="cal-cell blank" />;
+                          const val = history[habit.id]?.[cell.ds] || 0;
+                          const done = val >= habit.targetValue;
+                          const isTod = cell.ds === todayStr();
+                          return (
+                            <button key={cell.ds} className={`cal-cell pressable ${done ? 'done' : ''} ${isTod && !done ? 'today' : ''} ${isTod && done ? 'today done' : ''}`}
+                              style={{ background: done ? (habit.color || 'var(--accent)') : undefined }}
+                              onClick={() => { toggleHabit(habit.id, cell.ds); haptic(20); }}
+                              title={`${cell.ds}: ${val} logged`}>
+                              {cell.day}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+
+                  {habits.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '40px 20px', background: 'var(--bg-card)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-lg)' }}>
+                      <div style={{ fontSize: 32, marginBottom: 10 }}>📊</div>
+                      <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>Add habits to see calendar insights.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ━━━━━━ TAB: MILESTONES ━━━━━━ */}
+              {activeTab === 'arena' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                  {/* Profile card */}
+                  <div className="card" style={{ textAlign: 'center', padding: 24 }}>
+                    <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--bg-elevated)', border: '2px solid var(--border-active)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, margin: '0 auto 16px', boxShadow: '0 0 24px var(--accent-glow)' }}>
+                      {profile.avatarIcon}
+                    </div>
+                    <h3 style={{ fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em' }}>{profile.name}</h3>
+                    <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <span className="badge badge-accent">{profile.title}</span>
+                      <span className="badge badge-muted" style={{ fontFamily: 'var(--font-mono)' }}>Lv.{profile.level}</span>
+                    </div>
+
+                    {/* XP bar */}
+                    <div style={{ marginTop: 18 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span className="section-header">XP Progress</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{profile.xp} / {profile.level * 120} XP</span>
+                      </div>
+                      <div className="xp-bar">
+                        <div className="xp-bar-fill" style={{ width: `${Math.min(100, (profile.xp / (profile.level * 120)) * 100)}%` }} />
+                      </div>
+                    </div>
+
+                    {/* Avatar picker */}
+                    <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                      <div className="section-header" style={{ marginBottom: 12 }}>Select Avatar Icon</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+                        {AVATAR_ICONS.map(icon => (
+                          <button key={icon} className={`icon-btn pressable ${profile.avatarIcon === icon ? 'selected' : ''}`}
+                            onClick={() => { sfx('click', soundOn); haptic(20); const up = { ...profile, avatarIcon: icon }; setProfile(up); persist(null, null, up); }}>
+                            {icon}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Levels ladder */}
+                  <div className="section-header">Ranks Roadmap</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {LEVELS.map(lv => {
+                      const isCur = profile.level === lv.level;
+                      const reached = profile.level > lv.level;
+                      const locked = profile.level < lv.level;
+                      return (
+                        <div key={lv.level} className={`level-row ${isCur ? 'current' : reached ? 'unlocked' : 'locked'}`}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div style={{ width: 38, height: 38, borderRadius: 10, background: isCur ? 'var(--accent-dim)' : 'var(--bg)', border: `1px solid ${isCur ? 'var(--border-active)' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+                              {lv.icon}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginBottom: 2 }}>Level {lv.level}</div>
+                              <div style={{ fontSize: 12, fontWeight: 800, color: isCur ? 'var(--accent)' : 'var(--text-primary)' }}>{lv.title}</div>
+                            </div>
+                          </div>
+                          <div>
+                            {isCur && <span className="badge badge-accent">Current</span>}
+                            {reached && <span style={{ fontSize: 11, color: 'var(--success)', fontWeight: 700 }}>✓</span>}
+                            {locked && <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{lv.xp} XP</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+            </main>
+
+            {/* ── Bottom Navigation ── */}
+            <nav className="bottom-nav safe-bottom">
+              {[
+                { id: 'dashboard', label: 'Checklist', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
+                { id: 'habits', label: 'Rituals', icon: 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4' },
+                { id: 'analytics', label: 'Insights', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+                { id: 'arena', label: 'Milestones', icon: 'M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z' },
+              ].map(tab => (
+                <button key={tab.id} className={`nav-btn ${activeTab === tab.id ? 'active' : ''}`}
+                  onClick={() => { sfx('click', soundOn); setActiveTab(tab.id); haptic(25); }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d={tab.icon} />
+                  </svg>
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+
+            {/* ── Toast ── */}
+            {toast && <div className={`toast toast-${toast.type}`}>{toast.text}</div>}
+
+            {/* ── Level Up Modal ── */}
+            {levelUpData && (
+              <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+                onClick={() => setLevelUpData(null)}>
+                <div className="card animate-fade-up" style={{ maxWidth: 320, width: '100%', textAlign: 'center', padding: 28, border: '1px solid var(--border-active)' }} onClick={e => e.stopPropagation()}>
+                  <div style={{ fontSize: 52, marginBottom: 12 }}>{levelUpData.icon}</div>
+                  <div className="badge badge-accent" style={{ marginBottom: 10 }}>Level Up!</div>
+                  <h3 style={{ fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 6 }}>Level {levelUpData.level}</h3>
+                  <p style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 700, marginBottom: 6 }}>{levelUpData.title}</p>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 20 }}>You've unlocked a new rank. Keep the momentum going!</p>
+                  <button className="btn-primary" onClick={() => setLevelUpData(null)}>Continue →</button>
+                </div>
+              </div>
+            )}
+
+            {/* ── Add Habit Modal ── */}
+            {showAddModal && <AddHabitModal onClose={() => setShowAddModal(false)} onSubmit={createHabit} soundOn={soundOn} />}
+
+            {/* ── Edit Habit Modal ── */}
+            {editHabit && <EditHabitModal habit={editHabit} onClose={() => setEditHabit(null)} onSubmit={updateHabit} onDelete={deleteHabit} soundOn={soundOn} />}
+
+          </div>
+        </div>
+      );
+    }
+
+    /* ══════════════════════════════════════
+       ADD HABIT MODAL
+    ══════════════════════════════════════ */
+    function AddHabitModal({ onClose, onSubmit, soundOn }) {
+      const [name, setName] = useState('');
+      const [desc, setDesc] = useState('');
+      const [type, setType] = useState('checkbox');
+      const [target, setTarget] = useState(1);
+      const [unit, setUnit] = useState('Session');
+      const [cue, setCue] = useState('');
+      const [color, setColor] = useState('#FFB74D');
+      const [importance, setImportance] = useState('medium');
+
+      const handleSubmit = e => {
+        e.preventDefault();
+        if (!name.trim()) return;
+        onSubmit({ name: name.trim(), description: desc, type, targetValue: type === 'checkbox' ? 1 : Number(target), unit: type === 'checkbox' ? 'Session' : unit, cue, color, importance });
+      };
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal-panel" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
+              <div>
+                <h3 style={{ fontSize: 14, fontWeight: 900, letterSpacing: '-0.01em' }}>New Habit</h3>
+                <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>Define your routine parameters</p>
+              </div>
+              <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--bg-elevated)', border: '1px solid var(--border)', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>✕</button>
+            </div>
+
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label className="label">Habit Name *</label>
+                <input className="input-field" type="text" placeholder="e.g. Morning Meditation" required value={name} onChange={e => setName(e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Description</label>
+                <textarea className="input-field" placeholder="Success parameters..." rows={2} value={desc} onChange={e => setDesc(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="label">Goal Type</label>
+                <div className="tab-segment">
+                  <button type="button" className={`tab-seg-btn ${type === 'checkbox' ? 'active' : ''}`} onClick={() => setType('checkbox')}>✓ Simple Check</button>
+                  <button type="button" className={`tab-seg-btn ${type === 'numeric' ? 'active' : ''}`} onClick={() => setType('numeric')}>123 Numeric</button>
+                </div>
+                {type === 'numeric' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+                    <div>
+                      <label className="label">Target Count</label>
+                      <input className="input-field" type="number" min="1" value={target} onChange={e => setTarget(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="label">Unit</label>
+                      <input className="input-field" type="text" placeholder="Pages, mins..." value={unit} onChange={e => setUnit(e.target.value)} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label className="label">Anchor Cue</label>
+                  <input className="input-field" type="text" placeholder="After I wake up..." value={cue} onChange={e => setCue(e.target.value)} />
+                </div>
+                <div>
+                  <label className="label">Priority</label>
+                  <select className="input-field" value={importance} onChange={e => setImportance(e.target.value)}>
+                    <option value="medium">Standard</option>
+                    <option value="high">Critical</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="label">Accent Color</label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {HABIT_COLORS.map(c => (
+                    <button key={c} type="button" className={`swatch ${color === c ? 'selected' : ''}`} style={{ background: c }} onClick={() => setColor(c)} />
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+                <button type="button" className="btn-ghost" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
+                <button type="submit" className="btn-primary" style={{ flex: 2 }}>Add Habit 🌱</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    /* ══════════════════════════════════════
+       EDIT HABIT MODAL
+    ══════════════════════════════════════ */
+    function EditHabitModal({ habit, onClose, onSubmit, onDelete, soundOn }) {
+      const [name, setName] = useState(habit.name);
+      const [desc, setDesc] = useState(habit.description || '');
+      const [type, setType] = useState(habit.type);
+      const [target, setTarget] = useState(habit.targetValue);
+      const [unit, setUnit] = useState(habit.unit || 'Session');
+      const [cue, setCue] = useState(habit.cue || '');
+      const [color, setColor] = useState(habit.color || '#FFB74D');
+      const [importance, setImportance] = useState(habit.importance || 'medium');
+      const [confirmDelete, setConfirmDelete] = useState(false);
+
+      const handleSubmit = e => {
+        e.preventDefault();
+        if (!name.trim()) return;
+        onSubmit({ ...habit, name: name.trim(), description: desc, type, targetValue: type === 'checkbox' ? 1 : Number(target), unit: type === 'checkbox' ? 'Session' : unit, cue, color, importance });
+      };
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal-panel" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
+              <div>
+                <h3 style={{ fontSize: 14, fontWeight: 900, letterSpacing: '-0.01em' }}>Edit Habit</h3>
+                <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>Modify targets or parameters</p>
+              </div>
+              <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--bg-elevated)', border: '1px solid var(--border)', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>✕</button>
+            </div>
+
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label className="label">Habit Name *</label>
+                <input className="input-field" type="text" required value={name} onChange={e => setName(e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Description</label>
+                <textarea className="input-field" rows={2} value={desc} onChange={e => setDesc(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="label">Goal Type</label>
+                <div className="tab-segment">
+                  <button type="button" className={`tab-seg-btn ${type === 'checkbox' ? 'active' : ''}`} onClick={() => setType('checkbox')}>✓ Simple Check</button>
+                  <button type="button" className={`tab-seg-btn ${type === 'numeric' ? 'active' : ''}`} onClick={() => setType('numeric')}>123 Numeric</button>
+                </div>
+                {type === 'numeric' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+                    <div>
+                      <label className="label">Target</label>
+                      <input className="input-field" type="number" min="1" value={target} onChange={e => setTarget(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="label">Unit</label>
+                      <input className="input-field" type="text" placeholder="Pages, mins..." value={unit} onChange={e => setUnit(e.target.value)} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label className="label">Anchor Cue</label>
+                  <input className="input-field" type="text" value={cue} onChange={e => setCue(e.target.value)} />
+                </div>
+                <div>
+                  <label className="label">Priority</label>
+                  <select className="input-field" value={importance} onChange={e => setImportance(e.target.value)}>
+                    <option value="medium">Standard</option>
+                    <option value="high">Critical</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="label">Accent Color</label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {HABIT_COLORS.map(c => (
+                    <button key={c} type="button" className={`swatch ${color === c ? 'selected' : ''}`} style={{ background: c }} onClick={() => setColor(c)} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Delete section */}
+              <div style={{ paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                {confirmDelete ? (
+                  <div style={{ background: 'var(--danger-dim)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 12, padding: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                    <span style={{ fontSize: 11, color: 'var(--danger)', fontWeight: 700 }}>Delete this habit permanently?</span>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button type="button" onClick={() => onDelete(habit.id)} style={{ padding: '6px 12px', background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>Delete</button>
+                      <button type="button" onClick={() => setConfirmDelete(false)} style={{ padding: '6px 12px', background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>No</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button type="button" className="btn-danger" onClick={() => setConfirmDelete(true)} style={{ flex: 1 }}>🗑 Delete Habit</button>
+                    <button type="button" className="btn-ghost" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
+                    <button type="submit" className="btn-primary" style={{ flex: 1 }}>Save Changes</button>
+                  </div>
+                )}
+              </div>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    /* ── Mount ── */
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
