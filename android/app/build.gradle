@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "io.hab.app"
+    namespace = "com.hab"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "io.hab.app"
+        applicationId "com.hab"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
