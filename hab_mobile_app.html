@@ -981,6 +981,14 @@
       const handleGoogle = async () => {
         sfx('click', soundOn);
         haptic(40);
+
+        // Detect native mobile platform context
+        const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+        if (isNative) {
+          showToast('Google Popup auth is Web-only. Use Email/Password or Guest in native APK.', 'warning');
+          return;
+        }
+
         setAuthLoading(true);
         try {
           if (firebaseAvailable) {
@@ -1003,10 +1011,17 @@
             showToast('Google Sign-In requires Firebase connection', 'error');
           }
         } catch(err) {
+          console.error("Google Auth Error:", err);
           if (err.code === 'auth/popup-closed-by-user') {
             showToast('Sign-in cancelled', 'info');
+          } else if (err.code === 'auth/popup-blocked') {
+            showToast('Popup blocked! Please allow popups for this site.', 'error');
+          } else if (err.code === 'auth/unauthorized-domain') {
+            showToast('Domain not authorized! Add this domain to Firebase Auth Authorized Domains.', 'error');
+          } else if (err.code === 'auth/operation-not-supported-in-this-environment') {
+            showToast('Popups not supported in this app shell. Use Email or Guest.', 'error');
           } else {
-            showToast(err.message, 'error');
+            showToast(err.message || 'Google Sign-In failed. Check config or network.', 'error');
             sfx('error', soundOn);
           }
         } finally { setAuthLoading(false); }
@@ -1203,10 +1218,6 @@
               <div>
                 <label className="label">Email Address</label>
                 <input className="input-field" type="email" placeholder="you@domain.com" required value={authEmail} onChange={e => setAuthEmail(e.target.value)} />
-              </div>
-              <div>
-                <label className="label">Password</label>
-                <input className="input-field" type="password" placeholder="••••••••" required value={authEmail} onChange={e => setAuthEmail(e.target.value)} />
               </div>
               <div>
                 <label className="label">Password</label>
